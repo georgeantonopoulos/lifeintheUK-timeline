@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>British History Timeline</title>
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: 'Roboto', sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Add colors for different eras */
+    .era-ancient { background-color: #e0d0b0; border-left: 5px solid #c4a970; }
+    .era-medieval { background-color: #d0c0a0; border-left: 5px solid #a08060; }
+    .era-tudor { background-color: #c2d0c2; border-left: 5px solid #698069; }
+    .era-stuart { background-color: #d1c6da; border-left: 5px solid #9370b3; }
+    .era-georgian { background-color: #b0c8e0; border-left: 5px solid #5f84a9; }
+    .era-victorian { background-color: #c0cfe0; border-left: 5px solid #415a77; }
+    .era-modern { background-color: #d4e0e0; border-left: 5px solid #5e8a8a; }
+    .era-recent { background-color: #e0e0d4; border-left: 5px solid #7a7a64; }
+    
+    /* Event type indicators */
+    .event-war::before {
+      content: "⚔️";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 16px;
+    }
+    .event-politics::before {
+      content: "🏛️";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 16px;
+    }
+    .event-social::before {
+      content: "👪";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 16px;
+    }
+    .event-document::before {
+      content: "📜";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 16px;
+    }
+    .event-monarchy::before {
+      content: "👑";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 16px;
+    }
+    
+    .controls {
+      text-align: center;
+      padding: 1rem;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .timeline-wrapper {
+      position: relative;
+      padding: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 85vh;
+    }
+    .timeline-container {
+      position: relative;
+      width: 100%;
+      height: 70vh; /* Increased height */
+      margin: 0;
+      overflow-x: auto;
+      padding: 0;
+    }
+    .timeline-container::-webkit-scrollbar {
+      height: 8px;
+    }
+    .timeline-container::-webkit-scrollbar-track {
+      background: #e0e0e0;
+      border-radius: 4px;
+    }
+    .timeline-container::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+    .time-axis-line {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      height: 6px; /* Slightly thicker */
+      background-color: #666;
+      border-radius: 3px;
+      transform: translateY(-50%);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    /* Add time markers on the axis */
+    .time-marker {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+    }
+    .time-marker::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: -15px;
+      height: 10px;
+      width: 2px;
+      background-color: #888;
+      transform: translateX(-50%);
+    }
+    .timeline-item {
+      position: absolute;
+      width: 260px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 1rem;
+      transition: transform 0.2s, left 0.3s, top 0.3s;
+      z-index: 10;
+      padding-bottom: 1rem;
+    }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      background-color: #aaa;
+      z-index: -1;
+    }
+    .timeline-item.pos-above::before {
+      bottom: 0;
+      height: var(--connector-height, 20px);
+      background: linear-gradient(to bottom, rgba(170,170,170,0.7), rgba(170,170,170,1));
+    }
+    .timeline-item.pos-below::before {
+      top: 0;
+      height: var(--connector-height, 20px);
+      background: linear-gradient(to top, rgba(170,170,170,0.7), rgba(170,170,170,1));
+    }
+    /* Add a dot at the connection point with the timeline */
+    .timeline-item::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      background-color: #666;
+      border-radius: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+    }
+    .timeline-item.pos-above::after {
+      bottom: calc(var(--connector-height, 20px) * -1);
+      margin-bottom: -4px; /* Center dot on timeline */
+    }
+    .timeline-item.pos-below::after {
+      top: calc(var(--connector-height, 20px) * -1);
+      margin-top: -4px; /* Center dot on timeline */
+    }
+    /* Major events get special connector styling */
+    .timeline-item.major-event::after {
+      width: 12px;
+      height: 12px;
+      background-color: #1a73e8;
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.3);
+    }
+    .timeline-item.major-event.pos-above::after {
+      margin-bottom: -6px; /* Center larger dot on timeline */
+    }
+    .timeline-item.major-event.pos-below::after {
+      margin-top: -6px; /* Center larger dot on timeline */
+    }
+    /* Special styling for hover state on the connectors */
+    .timeline-item:hover::before {
+      background-color: #1a73e8;
+      width: 3px;
+    }
+    .timeline-item:hover::after {
+      background-color: #1a73e8;
+      box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.4);
+    }
+    .timeline-item:hover {
+      transform: translateY(-4px);
+      z-index: 11;
+    }
+    .date {
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: #1a73e8;
+    }
+    .description {
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .nav-button {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0,0,0,0.5);
+      border: none;
+      color: #fff;
+      font-size: 1.5rem;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .nav-button.left { left: 1rem; }
+    .nav-button.right { right: 1rem; }
+    /* Major events get highlighted with larger size and shadow */
+    .timeline-item.major-event {
+      width: 280px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+      border-top: 3px solid #1a73e8;
+      z-index: 12; /* Above other items */
+    }
+    /* Content inside the scroll container */
+    .timeline-content {
+      position: relative;
+      height: 100%;
+      /* width set by JS based on date span */
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <h1 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.5rem;">British History Timeline</h1>
+    <label>Zoom: <input type="range" id="zoom-slider" min="0.5" max="5" step="0.1" value="1"></label>
+  </div>
+  <div class="timeline-wrapper">
+    <button class="nav-button left" id="scroll-left">&#10094;</button>
+    <div class="timeline-container" id="timeline-container">
+      <div class="timeline-content" id="timeline-content">
+        <div class="time-axis-line" id="time-axis-line"></div>
+        <div class="timeline-item era-ancient">
+          <div class="date">Stone Age</div>
+          <div class="description">First people lived in Britain as hunter-gatherers.</div>
+        </div>
+        <div class="timeline-item era-ancient">
+          <div class="date">About 6,000 years ago</div>
+          <div class="description">First farmers arrived in Britain.</div>
+        </div>
+        <div class="timeline-item era-ancient">
+          <div class="date">43 AD – 410 AD</div>
+          <div class="description">Roman rule in Britain, including the building of Hadrian's Wall.</div>
+        </div>
+        <div class="timeline-item era-medieval major-event event-war">
+          <div class="date">1066</div>
+          <div class="description">Norman Conquest and Battle of Hastings. Start of the Middle Ages.</div>
+        </div>
+        <div class="timeline-item era-medieval major-event event-document">
+          <div class="date">1215</div>
+          <div class="description">Magna Carta.</div>
+        </div>
+        <div class="timeline-item era-medieval event-social">
+          <div class="date">1348</div>
+          <div class="description">Black Death.</div>
+        </div>
+        <div class="timeline-item era-medieval">
+          <div class="date">1400</div>
+          <div class="description">English became the preferred language of courts and official documents.</div>
+        </div>
+        <div class="timeline-item era-medieval">
+          <div class="date">1485</div>
+          <div class="description">End of the Middle Ages.</div>
+        </div>
+        <div class="timeline-item era-tudor">
+          <div class="date">1500s</div>
+          <div class="description">Act for the Government of Wales; Elizabethan period.</div>
+        </div>
+        <div class="timeline-item era-tudor event-war">
+          <div class="date">1588</div>
+          <div class="description">Defeat of the Spanish Armada.</div>
+        </div>
+        <div class="timeline-item era-stuart event-monarchy">
+          <div class="date">1603</div>
+          <div class="description">Union of the Crowns (James VI of Scotland becomes James I of England).</div>
+        </div>
+        <div class="timeline-item era-stuart event-war">
+          <div class="date">1640</div>
+          <div class="description">Beginning of the English Civil War.</div>
+        </div>
+        <div class="timeline-item era-stuart event-monarchy">
+          <div class="date">1660</div>
+          <div class="description">The Restoration of the monarchy.</div>
+        </div>
+        <div class="timeline-item era-stuart event-social">
+          <div class="date">1665</div>
+          <div class="description">Great Plague.</div>
+        </div>
+        <div class="timeline-item era-stuart event-document">
+          <div class="date">1679</div>
+          <div class="description">Habeas Corpus Act.</div>
+        </div>
+        <div class="timeline-item era-stuart event-politics">
+          <div class="date">1688</div>
+          <div class="description">Glorious Revolution.</div>
+        </div>
+        <div class="timeline-item era-stuart event-document major-event">
+          <div class="date">1689</div>
+          <div class="description">Bill of Rights.</div>
+        </div>
+        <div class="timeline-item era-georgian event-politics major-event">
+          <div class="date">1707</div>
+          <div class="description">Act of Union (England and Scotland) creates Kingdom of Great Britain.</div>
+        </div>
+        <div class="timeline-item era-georgian">
+          <div class="date">1700s</div>
+          <div class="description">The Enlightenment period.</div>
+        </div>
+        <div class="timeline-item era-georgian event-politics">
+          <div class="date">1776</div>
+          <div class="description">American colonies declare independence.</div>
+        </div>
+        <div class="timeline-item era-georgian event-politics major-event">
+          <div class="date">1800</div>
+          <div class="description">Act of Union with Ireland creates the UK of Great Britain and Ireland (effective 1801).</div>
+        </div>
+        <div class="timeline-item era-georgian event-war">
+          <div class="date">1805</div>
+          <div class="description">Battle of Trafalgar.</div>
+        </div>
+        <div class="timeline-item era-georgian event-war">
+          <div class="date">1815</div>
+          <div class="description">Battle of Waterloo.</div>
+        </div>
+        <div class="timeline-item era-georgian event-politics">
+          <div class="date">1832</div>
+          <div class="description">Reform Act.</div>
+        </div>
+        <div class="timeline-item era-georgian event-document major-event">
+          <div class="date">1833</div>
+          <div class="description">Emancipation Act (abolished slavery).</div>
+        </div>
+        <div class="timeline-item era-victorian event-monarchy major-event">
+          <div class="date">1837 – 1901</div>
+          <div class="description">Victorian Age (Queen Victoria's reign).</div>
+        </div>
+        <div class="timeline-item era-victorian event-war">
+          <div class="date">1853 – 1856</div>
+          <div class="description">Crimean War.</div>
+        </div>
+        <div class="timeline-item era-victorian event-war">
+          <div class="date">1889 – 1902</div>
+          <div class="description">Boer War.</div>
+        </div>
+        <div class="timeline-item era-victorian">
+          <div class="date">1900s (general)</div>
+          <div class="description">Period of significant inventions.</div>
+        </div>
+        <div class="timeline-item era-modern event-social">
+          <div class="date">Before WWI</div>
+          <div class="description">State retirement pension and free school meals introduced.</div>
+        </div>
+        <div class="timeline-item era-modern event-politics">
+          <div class="date">1913</div>
+          <div class="description">Home Rule proposed for Ireland.</div>
+        </div>
+        <div class="timeline-item era-modern event-war major-event">
+          <div class="date">1914 – 1918</div>
+          <div class="description">First World War.</div>
+        </div>
+        <div class="timeline-item era-modern event-war">
+          <div class="date">1916</div>
+          <div class="description">Easter Rising; Battle of the Somme.</div>
+        </div>
+        <div class="timeline-item era-modern event-social major-event">
+          <div class="date">1918</div>
+          <div class="description">Women aged 30+ get the vote; WWI ends (11/11).</div>
+        </div>
+        <div class="timeline-item era-modern event-politics">
+          <div class="date">1921</div>
+          <div class="description">Peace treaty splits Ireland.</div>
+        </div>
+        <div class="timeline-item era-modern event-social">
+          <div class="date">1928</div>
+          <div class="description">Women aged 21 get the vote; Penicillin discovered.</div>
+        </div>
+        <div class="timeline-item era-modern event-social">
+          <div class="date">1929</div>
+          <div class="description">Great Depression begins.</div>
+        </div>
+        <div class="timeline-item era-modern event-war major-event">
+          <div class="date">1939 – 1945</div>
+          <div class="description">Second World War.</div>
+        </div>
+        <div class="timeline-item era-modern event-war">
+          <div class="date">1940</div>
+          <div class="description">Evacuation of Dunkirk; Battle of Britain.</div>
+        </div>
+        <div class="timeline-item era-modern event-document">
+          <div class="date">1942</div>
+          <div class="description">Beveridge Report.</div>
+        </div>
+        <div class="timeline-item era-modern event-document">
+          <div class="date">1944</div>
+          <div class="description">Education Act.</div>
+        </div>
+        <div class="timeline-item era-modern event-war">
+          <div class="date">1945</div>
+          <div class="description">WWII ends.</div>
+        </div>
+        <div class="timeline-item era-modern event-social major-event">
+          <div class="date">1945 – 1950</div>
+          <div class="description">NHS and social security system established (NHS established 1948).</div>
+        </div>
+        <div class="timeline-item era-modern event-politics">
+          <div class="date">1947</div>
+          <div class="description">9 colonies gain independence.</div>
+        </div>
+        <div class="timeline-item era-recent event-war">
+          <div class="date">1982</div>
+          <div class="description">Argentina invaded Falkland Islands.</div>
+        </div>
+        <div class="timeline-item era-recent event-politics">
+          <div class="date">2024</div>
+          <div class="description">Labour government formed.</div>
+        </div>
+      </div>
+    </div>
+    <button class="nav-button right" id="scroll-right">&#10095;</button>
+  </div>
+
+  <script>
+    const timelineContainer = document.getElementById('timeline-container');
+    const timelineContent = document.getElementById('timeline-content');
+    const timeAxisLine = document.getElementById('time-axis-line');
+    const zoomSlider = document.getElementById('zoom-slider');
+    const scrollLeftBtn = document.getElementById('scroll-left');
+    const scrollRightBtn = document.getElementById('scroll-right');
+
+    const itemWidth = 260;
+    const minVerticalSpacing = 40; // Minimum space between items vertically
+    const itemHeight = 120; // Base height for calculations
+    const horizontalCollisionThreshold = itemWidth * 0.9; // Items closer than this horizontally may collide
+    const verticalCollisionThreshold = itemHeight * 0.8; // Vertical spacing required between items
+
+    // Zoom: recalculate axis and item positions
+    zoomSlider.addEventListener('input', () => {
+      // Preserve scroll ratio
+      const prevScrollLeft = timelineContainer.scrollLeft;
+      const maxScrollPrev = timelineContent.scrollWidth - timelineContainer.clientWidth;
+      const scrollRatio = maxScrollPrev > 0 ? prevScrollLeft / maxScrollPrev : 0;
+
+      positionItems();
+
+      // Restore scroll position
+      const maxScrollNew = timelineContent.scrollWidth - timelineContainer.clientWidth;
+      timelineContainer.scrollLeft = maxScrollNew > 0 ? scrollRatio * maxScrollNew : 0;
+    });
+
+    // Scroll functionality: simple scrollLeft assignments
+    function getScrollAmount() {
+      return timelineContainer.clientWidth * 0.8;
+    }
+    scrollLeftBtn.addEventListener('click', () => {
+      const delta = getScrollAmount();
+      timelineContainer.scrollLeft = Math.max(0, timelineContainer.scrollLeft - delta);
+    });
+    scrollRightBtn.addEventListener('click', () => {
+      const delta = getScrollAmount();
+      const maxScroll = timelineContainer.scrollWidth - timelineContainer.clientWidth;
+      timelineContainer.scrollLeft = Math.min(maxScroll, timelineContainer.scrollLeft + delta);
+    });
+
+    // Date parsing and positioning logic
+    function parseDateToYear(dateStr) {
+      dateStr = String(dateStr).trim();
+
+      if (dateStr.toLowerCase() === 'stone age') return -3000;
+      if (dateStr.toLowerCase().includes('6,000 years ago')) return -4000;
+      if (dateStr.toLowerCase() === 'before wwi') return 1910;
+
+      const yearMatch = dateStr.match(/(-?\d{3,4})/);
+      if (yearMatch) {
+        return parseInt(yearMatch[0], 10);
+      }
+
+      console.warn("Could not parse date:", dateStr);
+      return null;
+    }
+
+    function positionItems() {
+      const items = Array.from(timelineContainer.querySelectorAll('.timeline-item'));
+      const zoomLevel = parseFloat(zoomSlider.value);
+      
+      // Clear any existing markers
+      document.querySelectorAll('.time-marker').forEach(marker => marker.remove());
+
+      // 1. Calculate Date Range
+      let minYear = Infinity;
+      let maxYear = -Infinity;
+      const itemData = items.map(item => {
+        const dateStr = item.querySelector('.date').textContent;
+        const year = parseDateToYear(dateStr);
+        if (year !== null) {
+          minYear = Math.min(minYear, year);
+          maxYear = Math.max(maxYear, year);
+        }
+        return { item, year };
+      }).filter(data => data.year !== null);
+
+      if (minYear === Infinity || maxYear === -Infinity) return;
+
+      const yearSpan = maxYear - minYear;
+
+      // 2. Determine Axis Scale and Total Width (set on content, not container)
+      const basePixelsPerYear = 10;
+      const pixelsPerYear = basePixelsPerYear * zoomLevel;
+      const totalContentWidth = (yearSpan * pixelsPerYear) + (itemWidth * 2);
+      timelineContent.style.width = `${totalContentWidth}px`;
+      timeAxisLine.style.width = `${totalContentWidth}px`;
+
+      // Add date markers along the timeline
+      const markerInterval = zoomLevel <= 1 ? 500 : (zoomLevel <= 2 ? 200 : 100);
+      const startYear = Math.floor(minYear / markerInterval) * markerInterval;
+      
+      for (let year = startYear; year <= maxYear; year += markerInterval) {
+        if (year >= minYear) {
+          const yearsFromMin = year - minYear;
+          const markerPos = (yearsFromMin * pixelsPerYear) + itemWidth / 2;
+          
+          const marker = document.createElement('div');
+          marker.className = 'time-marker';
+          marker.style.left = `${markerPos}px`;
+          marker.textContent = year;
+          timelineContent.appendChild(marker);
+        }
+      }
+
+      // 3. Position Items - Improved to avoid overlapping
+      const containerMidY = timelineContainer.offsetHeight / 2;
+      const maxDistanceFromAxis = Math.floor((timelineContainer.offsetHeight / 2) - 60); // Reserve more space for margins
+      
+      // Group items by approximate period for optimized layout
+      const periods = [
+        {range: [-5000, 0], name: "ancient"},
+        {range: [1, 1500], name: "medieval"},
+        {range: [1501, 1700], name: "early-modern"},
+        {range: [1701, 1830], name: "georgian"},
+        {range: [1831, 1900], name: "victorian"},
+        {range: [1901, 1945], name: "early-20th"},
+        {range: [1946, 2000], name: "modern"},
+        {range: [2001, 2100], name: "contemporary"}
+      ];
+      
+      // Sort items by year for proper sequential layout
+      itemData.sort((a, b) => a.year - b.year);
+      
+      // Track positions for collision detection
+      const abovePositions = [];
+      const belowPositions = [];
+      
+      // Find period with most items to scale vertical spacing
+      const periodItemCounts = periods.map(period => {
+        return itemData.filter(data => {
+          return data.year >= period.range[0] && data.year <= period.range[1];
+        }).length;
+      });
+      const maxItemsInPeriod = Math.max(...periodItemCounts);
+      
+      // Calculate optimal vertical tier distribution
+      const getOptimalTier = (positions, horizontalPos, baseDistance) => {
+        let tier = 1;
+        let foundTier = false;
+        
+        while (!foundTier && tier < 10) { // Limit to 10 tiers to prevent infinite loops
+          const testDistance = baseDistance * tier;
+          let collision = false;
+          
+          for (const pos of positions) {
+            const xDiff = Math.abs(pos.x - horizontalPos);
+            if (xDiff < horizontalCollisionThreshold && Math.abs(pos.tier - tier) < 1.5) {
+              collision = true;
+              break;
+            }
+          }
+          
+          if (!collision) {
+            foundTier = true;
+          } else {
+            tier++;
+          }
+        }
+        
+        return tier;
+      };
+      
+      // Position each item with improved collision avoidance
+      itemData.forEach((data, index) => {
+        const { item, year } = data;
+        const yearsFromMin = year - minYear;
+        const horizontalPos = (yearsFromMin * pixelsPerYear) + itemWidth / 2;
+        
+        // Determine which period this item belongs to for distributing vertically
+        let period = periods.find(p => year >= p.range[0] && year <= p.range[1]) || periods[0];
+        
+        // Alternate above/below the timeline based on both index and year clustering
+        const isAbove = index % 2 === 0;
+        
+        // Calculate optimal vertical position based on tiers
+        let verticalPos;
+        let connectorHeight;
+        let tier;
+        
+        const baseVerticalDistance = Math.min(maxDistanceFromAxis / 5, 70); // Limit maximum distance per tier
+        
+        if (isAbove) {
+          // Get optimal tier for items above the timeline
+          tier = getOptimalTier(abovePositions, horizontalPos, baseVerticalDistance);
+          
+          // Calculate vertical position based on tier
+          const basePos = containerMidY - minVerticalSpacing;
+          const tierDistance = baseVerticalDistance * tier;
+          verticalPos = basePos - tierDistance - itemHeight;
+          
+          // Ensure the item stays within visible area
+          verticalPos = Math.max(10, verticalPos);
+          
+          // Calculate connector height with slight adjustment for timeline alignment
+          connectorHeight = Math.abs(basePos - verticalPos - itemHeight) + 2; // +2 ensures it reaches timeline
+          
+          // Record this position
+          abovePositions.push({ x: horizontalPos, y: verticalPos, tier });
+        } else {
+          // Get optimal tier for items below the timeline
+          tier = getOptimalTier(belowPositions, horizontalPos, baseVerticalDistance);
+          
+          // Calculate vertical position based on tier
+          const basePos = containerMidY + minVerticalSpacing;
+          const tierDistance = baseVerticalDistance * tier;
+          verticalPos = basePos + tierDistance;
+          
+          // Ensure the item stays within visible area
+          verticalPos = Math.min(timelineContainer.offsetHeight - itemHeight - 10, verticalPos);
+          
+          // Calculate connector height
+          connectorHeight = Math.abs(verticalPos - basePos) + 2; // +2 ensures it reaches timeline
+          
+          // Record this position
+          belowPositions.push({ x: horizontalPos, y: verticalPos, tier });
+        }
+        
+        // Apply the calculated position
+        item.style.left = `${horizontalPos}px`;
+        item.style.top = `${verticalPos}px`;
+        
+        // Update connector height
+        if (isAbove) {
+          item.classList.add('pos-above');
+          item.classList.remove('pos-below');
+          item.style.setProperty('--connector-height', `${connectorHeight}px`);
+        } else {
+          item.classList.add('pos-below');
+          item.classList.remove('pos-above');
+          item.style.setProperty('--connector-height', `${connectorHeight}px`);
+        }
+        
+        // Special styling for major events
+        if (item.classList.contains('major-event')) {
+          // Give major events more emphasis
+          if (isAbove) {
+            item.style.top = `${parseFloat(item.style.top) - 10}px`;
+            item.style.setProperty('--connector-height', `${connectorHeight + 10}px`);
+          } else {
+            item.style.top = `${parseFloat(item.style.top) + 10}px`;
+            item.style.setProperty('--connector-height', `${connectorHeight + 10}px`);
+          }
+        }
+      });
+    }
+
+    // Initial positioning
+    positionItems();
+
+    // Regenerate on window resize if layout changes
+    window.addEventListener('resize', () => {
+      positionItems();
+    });
+  </script>
+</body>
+</html>
