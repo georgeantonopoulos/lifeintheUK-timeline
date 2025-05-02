@@ -109,6 +109,7 @@
       border-radius: 3px;
       transform: translateY(-50%);
       box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      z-index: 2; /* Above connector lines but below dots */
     }
     /* Add time markers on the axis */
     .time-marker {
@@ -118,6 +119,7 @@
       font-size: 12px;
       color: #666;
       text-align: center;
+      z-index: 3; /* Above timeline */
     }
     .time-marker::before {
       content: '';
@@ -137,73 +139,49 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       padding: 1rem;
       transition: transform 0.2s, left 0.3s, top 0.3s;
-      z-index: 10;
+      z-index: 10; /* Above connectors and dots */
       padding-bottom: 1rem;
     }
-    .timeline-item::before {
-      content: '';
+    /* Use a separate element for connectors to avoid z-index issues */
+    .timeline-connector {
       position: absolute;
+      width: 2px;
       left: 50%;
       transform: translateX(-50%);
-      width: 2px;
       background-color: #aaa;
-      z-index: -1;
+      z-index: 1; /* Above axis, below dots and items */
+      pointer-events: none;
     }
-    .timeline-item.pos-above::before {
-      bottom: 0;
-      height: var(--connector-height, 20px);
+    .timeline-connector.pos-above {
+      top: 100%; /* Start from bottom of item */
       background: linear-gradient(to bottom, rgba(170,170,170,0.7), rgba(170,170,170,1));
     }
-    .timeline-item.pos-below::before {
-      top: 0;
-      height: var(--connector-height, 20px);
+    .timeline-connector.pos-below {
+      bottom: 100%; /* Start from top of item */
       background: linear-gradient(to top, rgba(170,170,170,0.7), rgba(170,170,170,1));
     }
-    /* Add a dot at the connection point with the timeline */
-    .timeline-item::after {
-      content: '';
+    /* Dots are separate elements too */
+    .timeline-dot {
       position: absolute;
-      left: 50%;
       width: 8px;
       height: 8px;
+      left: 50%;
+      transform: translateX(-50%);
       background-color: #666;
       border-radius: 50%;
-      transform: translateX(-50%);
-      z-index: 5;
+      z-index: 4; /* Above connectors and axis */
+      pointer-events: none;
     }
-    .timeline-item.pos-above::after {
-      bottom: calc(var(--connector-height, 20px) * -1);
-      margin-bottom: -4px; /* Center dot on timeline */
-    }
-    .timeline-item.pos-below::after {
-      top: calc(var(--connector-height, 20px) * -1);
-      margin-top: -4px; /* Center dot on timeline */
-    }
-    /* Major events get special connector styling */
-    .timeline-item.major-event::after {
+    .timeline-dot.major {
       width: 12px;
       height: 12px;
       background-color: #1a73e8;
       box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.3);
     }
-    .timeline-item.major-event.pos-above::after {
-      margin-bottom: -6px; /* Center larger dot on timeline */
-    }
-    .timeline-item.major-event.pos-below::after {
-      margin-top: -6px; /* Center larger dot on timeline */
-    }
-    /* Special styling for hover state on the connectors */
-    .timeline-item:hover::before {
-      background-color: #1a73e8;
-      width: 3px;
-    }
-    .timeline-item:hover::after {
-      background-color: #1a73e8;
-      box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.4);
-    }
-    .timeline-item:hover {
-      transform: translateY(-4px);
-      z-index: 11;
+    /* Remove any old dot styles for compatibility */
+    .timeline-item::before, 
+    .timeline-item::after {
+      display: none;
     }
     .date {
       font-weight: 700;
@@ -245,6 +223,11 @@
       position: relative;
       height: 100%;
       /* width set by JS based on date span */
+    }
+    /* Add hover effect back */
+    .timeline-item:hover {
+      transform: translateY(-4px);
+      z-index: 20; /* Jump above everything when hovered */
     }
   </style>
 </head>
@@ -510,8 +493,8 @@
       const items = Array.from(timelineContainer.querySelectorAll('.timeline-item'));
       const zoomLevel = parseFloat(zoomSlider.value);
       
-      // Clear any existing markers
-      document.querySelectorAll('.time-marker').forEach(marker => marker.remove());
+      // Clear any existing markers, connectors and dots
+      document.querySelectorAll('.time-marker, .timeline-connector, .timeline-dot').forEach(el => el.remove());
 
       // 1. Calculate Date Range
       let minYear = Infinity;
@@ -532,13 +515,40 @@
 
       // 2. Determine Axis Scale and Total Width (set on content, not container)
       const basePixelsPerYear = 10;
-      const pixelsPerYear = basePixelsPerYear * zoomLevel;
+      let pixelsPerYear;
+      
+      // At minimum zoom, fit all dates within the visible container
+      const minZoomLevel = parseFloat(zoomSlider.min);
+      if (zoomLevel === minZoomLevel) {
+        // Calculate pixels per year to fit all content in view
+        pixelsPerYear = (timelineContainer.clientWidth - itemWidth * 2) / yearSpan;
+      } else {
+        pixelsPerYear = basePixelsPerYear * zoomLevel;
+      }
+      
       const totalContentWidth = (yearSpan * pixelsPerYear) + (itemWidth * 2);
-      timelineContent.style.width = `${totalContentWidth}px`;
-      timeAxisLine.style.width = `${totalContentWidth}px`;
+      
+      // Ensure content is at least as wide as the container
+      const visibleWidth = Math.max(totalContentWidth, timelineContainer.clientWidth);
+      timelineContent.style.width = `${visibleWidth}px`;
+      timeAxisLine.style.width = `${visibleWidth}px`;
 
       // Add date markers along the timeline
-      const markerInterval = zoomLevel <= 1 ? 500 : (zoomLevel <= 2 ? 200 : 100);
+      // Adjust marker interval based on zoom level and date range
+      let markerInterval;
+      if (zoomLevel <= minZoomLevel) {
+        markerInterval = Math.ceil(yearSpan / 10); // Show about 10 markers at min zoom
+      } else if (zoomLevel <= 1) {
+        markerInterval = 500;
+      } else if (zoomLevel <= 2) {
+        markerInterval = 200;
+      } else if (zoomLevel <= 3) {
+        markerInterval = 100;
+      } else {
+        markerInterval = 50;
+      }
+      
+      // Round the start year down to nearest interval
       const startYear = Math.floor(minYear / markerInterval) * markerInterval;
       
       for (let year = startYear; year <= maxYear; year += markerInterval) {
@@ -554,9 +564,9 @@
         }
       }
 
-      // 3. Position Items - Improved to avoid overlapping
+      // 3. Position Each Item with Improved Collision Avoidance
       const containerMidY = timelineContainer.offsetHeight / 2;
-      const maxDistanceFromAxis = Math.floor((timelineContainer.offsetHeight / 2) - 60); // Reserve more space for margins
+      const maxDistanceFromAxis = Math.floor((timelineContainer.offsetHeight / 2) - 60);
       
       // Group items by approximate period for optimized layout
       const periods = [
@@ -570,27 +580,12 @@
         {range: [2001, 2100], name: "contemporary"}
       ];
       
-      // Sort items by year for proper sequential layout
-      itemData.sort((a, b) => a.year - b.year);
-      
-      // Track positions for collision detection
-      const abovePositions = [];
-      const belowPositions = [];
-      
-      // Find period with most items to scale vertical spacing
-      const periodItemCounts = periods.map(period => {
-        return itemData.filter(data => {
-          return data.year >= period.range[0] && data.year <= period.range[1];
-        }).length;
-      });
-      const maxItemsInPeriod = Math.max(...periodItemCounts);
-      
       // Calculate optimal vertical tier distribution
       const getOptimalTier = (positions, horizontalPos, baseDistance) => {
         let tier = 1;
         let foundTier = false;
         
-        while (!foundTier && tier < 10) { // Limit to 10 tiers to prevent infinite loops
+        while (!foundTier && tier < 10) {
           const testDistance = baseDistance * tier;
           let collision = false;
           
@@ -612,85 +607,104 @@
         return tier;
       };
       
-      // Position each item with improved collision avoidance
+      // Track positions for collision detection
+      const abovePositions = [];
+      const belowPositions = [];
+      
       itemData.forEach((data, index) => {
         const { item, year } = data;
         const yearsFromMin = year - minYear;
         const horizontalPos = (yearsFromMin * pixelsPerYear) + itemWidth / 2;
         
-        // Determine which period this item belongs to for distributing vertically
-        let period = periods.find(p => year >= p.range[0] && year <= p.range[1]) || periods[0];
-        
-        // Alternate above/below the timeline based on both index and year clustering
+        // Determine position above/below timeline
         const isAbove = index % 2 === 0;
         
-        // Calculate optimal vertical position based on tiers
-        let verticalPos;
-        let connectorHeight;
-        let tier;
+        // Get period this item belongs to
+        const period = periods.find(p => year >= p.range[0] && year <= p.range[1]) || periods[0];
         
-        const baseVerticalDistance = Math.min(maxDistanceFromAxis / 5, 70); // Limit maximum distance per tier
+        // Calculate vertical position
+        let verticalPos;
+        const baseVerticalDistance = Math.min(maxDistanceFromAxis / 5, 70);
         
         if (isAbove) {
-          // Get optimal tier for items above the timeline
-          tier = getOptimalTier(abovePositions, horizontalPos, baseVerticalDistance);
-          
-          // Calculate vertical position based on tier
+          // For items above timeline
+          const itemTier = getOptimalTier(abovePositions, horizontalPos, baseVerticalDistance);
           const basePos = containerMidY - minVerticalSpacing;
-          const tierDistance = baseVerticalDistance * tier;
+          const tierDistance = baseVerticalDistance * itemTier;
           verticalPos = basePos - tierDistance - itemHeight;
-          
-          // Ensure the item stays within visible area
           verticalPos = Math.max(10, verticalPos);
           
-          // Calculate connector height with slight adjustment for timeline alignment
-          connectorHeight = Math.abs(basePos - verticalPos - itemHeight) + 2; // +2 ensures it reaches timeline
-          
           // Record this position
-          abovePositions.push({ x: horizontalPos, y: verticalPos, tier });
+          abovePositions.push({ x: horizontalPos, y: verticalPos, tier: itemTier });
         } else {
-          // Get optimal tier for items below the timeline
-          tier = getOptimalTier(belowPositions, horizontalPos, baseVerticalDistance);
-          
-          // Calculate vertical position based on tier
+          // For items below timeline
+          const itemTier = getOptimalTier(belowPositions, horizontalPos, baseVerticalDistance);
           const basePos = containerMidY + minVerticalSpacing;
-          const tierDistance = baseVerticalDistance * tier;
+          const tierDistance = baseVerticalDistance * itemTier;
           verticalPos = basePos + tierDistance;
-          
-          // Ensure the item stays within visible area
           verticalPos = Math.min(timelineContainer.offsetHeight - itemHeight - 10, verticalPos);
           
-          // Calculate connector height
-          connectorHeight = Math.abs(verticalPos - basePos) + 2; // +2 ensures it reaches timeline
-          
           // Record this position
-          belowPositions.push({ x: horizontalPos, y: verticalPos, tier });
+          belowPositions.push({ x: horizontalPos, y: verticalPos, tier: itemTier });
         }
-        
-        // Apply the calculated position
+
+        // Apply calculated position to the item
         item.style.left = `${horizontalPos}px`;
         item.style.top = `${verticalPos}px`;
         
-        // Update connector height
+        // Create and position connector
+        const connector = document.createElement('div');
+        connector.className = isAbove ? 'timeline-connector pos-above' : 'timeline-connector pos-below';
+        
+        // Calculate connector height and position
+        let connectorHeight;
+        if (isAbove) {
+          connectorHeight = Math.abs(containerMidY - (verticalPos + itemHeight));
+        } else {
+          connectorHeight = Math.abs(verticalPos - containerMidY);
+        }
+        
+        // Set connector height and position
+        connector.style.height = `${connectorHeight}px`;
+        connector.style.left = `${horizontalPos}px`;
+        connector.style.top = isAbove ? `${verticalPos + itemHeight}px` : `${verticalPos - connectorHeight}px`;
+        
+        // Create and position dot
+        const dot = document.createElement('div');
+        dot.className = item.classList.contains('major-event') ? 'timeline-dot major' : 'timeline-dot';
+        dot.style.left = `${horizontalPos}px`;
+        dot.style.top = `${containerMidY - 4}px`; // Center dot on timeline (8px height / 2 = 4px)
+        
+        // Add connector and dot to the timeline
+        timelineContent.appendChild(connector);
+        timelineContent.appendChild(dot);
+        
+        // Set appropriate classes on item
         if (isAbove) {
           item.classList.add('pos-above');
           item.classList.remove('pos-below');
-          item.style.setProperty('--connector-height', `${connectorHeight}px`);
         } else {
           item.classList.add('pos-below');
           item.classList.remove('pos-above');
-          item.style.setProperty('--connector-height', `${connectorHeight}px`);
         }
         
         // Special styling for major events
         if (item.classList.contains('major-event')) {
-          // Give major events more emphasis
+          // Move major events further from axis but adjust their connectors accordingly
           if (isAbove) {
             item.style.top = `${parseFloat(item.style.top) - 10}px`;
-            item.style.setProperty('--connector-height', `${connectorHeight + 10}px`);
+            // Update connector with new position
+            connector.style.height = `${connectorHeight + 10}px`;
+            connector.style.top = `${parseFloat(item.style.top) + itemHeight}px`;
+            // Adjust dot position for major events
+            dot.style.top = `${containerMidY - 6}px`; // Center adjusted for 12px height
           } else {
             item.style.top = `${parseFloat(item.style.top) + 10}px`;
-            item.style.setProperty('--connector-height', `${connectorHeight + 10}px`);
+            // Update connector with new position
+            connector.style.height = `${connectorHeight + 10}px`;
+            connector.style.top = `${parseFloat(item.style.top) - connectorHeight - 10}px`;
+            // Adjust dot position for major events
+            dot.style.top = `${containerMidY - 6}px`; // Center adjusted for 12px height
           }
         }
       });
